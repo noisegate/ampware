@@ -4,7 +4,7 @@ Copyright (C) 2015 Marcell Marosvolgyi
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
+as publisgithed by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
@@ -26,6 +26,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define encoder0PinB 3
 #define mutebuttonPin 6
 #define mutesignalPin 7
+
+//took some code from adafruit 
+//https://learn.adafruit.com/adafruit-20w-stereo-audio-amplifier-class-d-max9744/digital-control
 // 0x4B is the default i2c address
 #define MAX9744_I2CADDR 0x4B
 
