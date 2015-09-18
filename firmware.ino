@@ -22,10 +22,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <avr/pgmspace.h>
 
 //encoder code http://playground.arduino.cc/Main/RotaryEncoders
-#define encoder0PinA 2
-#define encoder0PinB 3
-#define mutebuttonPin 6
-#define mutesignalPin 7
+#define encoder0PinA 2   //atmel pin 4_PD2
+#define encoder0PinB 3   //atmel pin 5_PD3
+
+//other functionality
+#define mutebuttonPin 6  //atmel pin 12_PD6
+#define mutesignalPin 7  //atmel pin 13_PD7
+#define backlight 10     //atmel pin 16_PB2
 
 //took some code from adafruit 
 //https://learn.adafruit.com/adafruit-20w-stereo-audio-amplifier-class-d-max9744/digital-control
@@ -103,9 +106,11 @@ const float decibel[] PROGMEM = {
 };
 
 volatile int encoder0Pos = 0;
-volatile boolean standby=false; 
+volatile boolean standby=true;// I think is good 2b standby when ya turn it on 
+
 // We'll track the volume level in this variable.
 int8_t thevol = 31;
+
 byte speaker[8] = {
   B00010,
   B00110,
@@ -129,12 +134,11 @@ byte loud[8]={
 
 LiquidCrystal lcd(12, 11, 5, 4, 9, 8);//3,2->9,8 last 4 digits is data
 
-
 void setup(){
   pinMode(13, OUTPUT);
   pinMode(mutesignalPin, OUTPUT);
   pinMode(mutebuttonPin, INPUT);digitalWrite(mutebuttonPin, HIGH);//pullup
-  
+  pinMode(backlight, OUTPUT);
   digitalWrite(mutesignalPin, LOW);
     // set up the LCD's number of columns and rows:
   lcd.createChar(0, speaker);
@@ -152,7 +156,7 @@ void setup(){
   Wire.begin();//i2c stuff
   
   //fun stuff
-  
+  digitalWrite(backlight, HIGH);  
   updatelcd(0);
 }
 
@@ -188,24 +192,28 @@ void loop(){
     //digitalWrite(13,HIGH);
     if (standby){
       //mute and go standby
-      digitalWrite(13, HIGH);
+      digitalWrite(13, LOW);
       for (int i=enchange; i>0; i--){
         updatelcd(i);
         if (!setvolume(int8_t(i)))
           msglcd("I2C ERROR");
+        analogWrite(backlight, (byte)(255.0*i/enchange));
         delay(10);
       }
       digitalWrite(mutesignalPin, HIGH);
+      digitalWrite(backlight, LOW);
       mutelcd();
     }else{
-      digitalWrite(13, LOW);
+      digitalWrite(13, HIGH);
       digitalWrite(mutesignalPin, LOW);
+      //digitalWrite(backlight, HIGH);
       encoder0Pos = enchange; //if vol knob turned during standby, dismiss result
       //wakeup. do it slowly, we dont want to blow our tweeters
       for (int i=0; i<enchange; i++){
         updatelcd(i);
         if (!setvolume(int8_t(i)))
           msglcd("I2C ERROR");
+        analogWrite(backlight, (byte)(255.0*i/enchange));   
         delay(10);
       }
       
