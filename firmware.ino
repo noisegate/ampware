@@ -21,14 +21,33 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <Wire.h>
 #include <avr/pgmspace.h>
 
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+  #include <avr/power.h>
+#endif
+
+#define NUMPIXELS      16
+
+#define RXD 0           //atmel pin 2_PD0
+#define TXD 1           //atmel pin 3_PD1
 //encoder code http://playground.arduino.cc/Main/RotaryEncoders
+//cant change these, should be 2 & 3 for interrupt
+
 #define encoder0PinA 2   //atmel pin 4_PD2
 #define encoder0PinB 3   //atmel pin 5_PD3
 
 //other functionality
-#define mutebuttonPin 6  //atmel pin 12_PD6
-#define mutesignalPin 7  //atmel pin 13_PD7
-#define backlight 10     //atmel pin 16_PB2
+#define MUTEBUTTONPIN 4  //atmel pin 6_PD4
+#define BACKLIGHT 5      //atmel pin 11_PB5 must be pwm
+#define NEOPIN 6         //atmel pin 12_PD6 must be pwm
+#define MUTESIGNALPIN 7  //atmel pin 13_PD7
+
+#define RS    13        //atmel pin 19_PB5 LCD pin 4
+#define EN    12        //atmel pin 18_PB4 LCD pin 6
+#define D4    11        //atmel pin 17_PB3 LCD pin 11
+#define D5    10        //atmel pin 16_PB2 LCD pin 12   
+#define D6     9        //atmel pin 15_PB1 LCD pin 13
+#define D7     8        //atmel pin 14_PB0 LCD pin 14
 
 //took some code from adafruit 
 //https://learn.adafruit.com/adafruit-20w-stereo-audio-amplifier-class-d-max9744/digital-control
@@ -105,8 +124,12 @@ const float decibel[] PROGMEM = {
   9.5
 };
 
+const byte redmap[] PROGMEM = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+const byte greenmap[] PROGMEM = {1,2,3,4,5,6,7,8,9,10,11,0,0,0,0,0};
+const byte bluemap[] PROGMEM = {1,2,3,4,5,6,7,8,9,10,11,0,0,0,0,0};
+
 volatile int encoder0Pos = 0;
-volatile boolean standby=true;// I think is good 2b standby when ya turn it on 
+volatile boolean standby=false;// I think is good 2b standby when ya turn it on 
 
 // We'll track the volume level in this variable.
 int8_t thevol = 31;
@@ -132,14 +155,16 @@ byte loud[8]={
    B00000,
 };
 
-LiquidCrystal lcd(12, 11, 5, 4, 9, 8);//3,2->9,8 last 4 digits is data
+//IU objects
+LiquidCrystal lcd(RS, EN,D4,D5,D6,D7);
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, NEOPIN, NEO_GRB + NEO_KHZ800);
 
 void setup(){
   pinMode(13, OUTPUT);
-  pinMode(mutesignalPin, OUTPUT);
-  pinMode(mutebuttonPin, INPUT);digitalWrite(mutebuttonPin, HIGH);//pullup
-  pinMode(backlight, OUTPUT);
-  digitalWrite(mutesignalPin, LOW);
+  pinMode(MUTESIGNALPIN, OUTPUT);
+  pinMode(MUTEBUTTONPIN, INPUT_PULLUP);
+  pinMode(BACKLIGHT, OUTPUT);
+  digitalWrite(MUTESIGNALPIN, LOW);
     // set up the LCD's number of columns and rows:
   lcd.createChar(0, speaker);
   lcd.createChar(1, loud);
@@ -156,8 +181,18 @@ void setup(){
   Wire.begin();//i2c stuff
   
   //fun stuff
-  digitalWrite(backlight, HIGH);  
+  digitalWrite(BACKLIGHT, HIGH);  
   updatelcd(0);
+
+
+  #if defined (__AVR_ATtiny85__)
+  if (F_CPU == 16000000) clock_prescale_set(clock_div_1);
+  #endif
+  // End of trinket special code
+
+  pixels.begin(); // This initializes the NeoPixel library.
+
+  updatering(0);
 }
 
 void loop(){
@@ -181,44 +216,49 @@ void loop(){
       encoder0Pos = 0;
     }
     updatelcd(enchange);
+    updatering(enchange);
     if (!setvolume(int8_t(enchange)))
       msglcd("I2C ERROR");
   }
   
  // temp = digitalRead(mutebuttonPin);
-  
-  if (digitalRead(mutebuttonPin)==LOW){
+  if (standby)
+    blinkring();
+    
+  if (digitalRead(MUTEBUTTONPIN)==LOW){
     standby=!standby;
     //digitalWrite(13,HIGH);
     if (standby){
       //mute and go standby
-      digitalWrite(13, LOW);
+      //digitalWrite(13, LOW);
       for (int i=enchange; i>0; i--){
         updatelcd(i);
+        updatering(i);
         if (!setvolume(int8_t(i)))
           msglcd("I2C ERROR");
-        analogWrite(backlight, (byte)(255.0*i/enchange));
+        analogWrite(BACKLIGHT, (byte)(255.0*i/enchange));
         delay(10);
       }
-      digitalWrite(mutesignalPin, HIGH);
-      digitalWrite(backlight, LOW);
+      digitalWrite(MUTESIGNALPIN, HIGH);
+      digitalWrite(BACKLIGHT, LOW);
       mutelcd();
     }else{
-      digitalWrite(13, HIGH);
-      digitalWrite(mutesignalPin, LOW);
-      //digitalWrite(backlight, HIGH);
+      //digitalWrite(13, HIGH);
+      digitalWrite(MUTESIGNALPIN, LOW);
+      //digitalWrite(BACKLIGHT, HIGH);
       encoder0Pos = enchange; //if vol knob turned during standby, dismiss result
       //wakeup. do it slowly, we dont want to blow our tweeters
       for (int i=0; i<enchange; i++){
         updatelcd(i);
+        updatering(i);
         if (!setvolume(int8_t(i)))
           msglcd("I2C ERROR");
-        analogWrite(backlight, (byte)(255.0*i/enchange));   
+        analogWrite(BACKLIGHT, (byte)(255.0*i/enchange));   
         delay(10);
       }
       
     }
-    while(digitalRead(mutebuttonPin)==LOW){};
+    while(digitalRead(MUTEBUTTONPIN)==LOW){};
     delay(1000);//software debounce
   }
   //delay(100);
@@ -232,11 +272,7 @@ void mutelcd(){
 
 void updatelcd(int encoder){
     float attenuation;
-    //lcd.setCursor(0,0);
-    //lcd.print ("                ");
-    //lcd.setCursor(0, 1);
-    //lcd.print ("                ");
-    //lcd.setCursor(0,0);
+
     lcd.clear();
     lcd.print("Vol: ");
     lcd.print((int)(encoder/63.0*100));
@@ -260,6 +296,39 @@ void msglcd(String m){
   lcd.clear();
   lcd.setCursor(0,0);
   lcd.print (m);
+}
+
+void updatering(int encoder){
+
+  for(int i=0;i<NUMPIXELS;i++){
+    pixels.setPixelColor(i, pixels.Color(0,0,0)); // grey.
+  }
+
+  pixels.setPixelColor( encoder/4, 
+                        pixels.Color(pgm_read_byte_near(redmap+(encoder/4)),
+                                     pgm_read_byte_near(greenmap+(encoder/4)),
+                                     pgm_read_byte_near(bluemap+(encoder/4))));
+  pixels.show(); // This sends the updated pixel color to the hardware.
+}
+
+void blinkring(){
+  static byte bouncy=1;
+  static int delaycnt=30001;
+  static int steps=1;
+
+  delaycnt++;
+  
+  if (delaycnt > 30000){
+    bouncy += steps;
+    if (bouncy>10) steps=-1;
+    if (bouncy<1) steps=1;
+    
+    delaycnt=0;
+    for (int i=0; i<NUMPIXELS; i++){
+      pixels.setPixelColor(i, pixels.Color(bouncy, bouncy, bouncy));
+    }
+    pixels.show();
+  }
 }
 
 boolean setvolume(int8_t v) {
