@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #endif
 
 #define NUMPIXELS      16
+#define MAXPIXEL       NUMPIXELS-1 //the zerobased highest address
 
 #define RXD 0           //atmel pin 2_PD0
 #define TXD 1           //atmel pin 3_PD1
@@ -48,6 +49,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define D5    10        //atmel pin 16_PB2 LCD pin 12   
 #define D6     9        //atmel pin 15_PB1 LCD pin 13
 #define D7     8        //atmel pin 14_PB0 LCD pin 14
+
+#define SPEAKER 0       //custom character
+#define LOUD 1          //custom character
 
 //took some code from adafruit 
 //https://learn.adafruit.com/adafruit-20w-stereo-audio-amplifier-class-d-max9744/digital-control
@@ -124,15 +128,12 @@ const float decibel[] PROGMEM = {
   9.5
 };
 
-const byte redmap[] PROGMEM = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
-const byte greenmap[] PROGMEM = {1,2,3,4,5,6,7,8,9,10,11,0,0,0,0,0};
-const byte bluemap[] PROGMEM = {1,2,3,4,5,6,7,8,9,10,11,0,0,0,0,0};
+const byte redmap[] PROGMEM =   {2,2,2,2,2,2,2,2,2,2,3,4,5,5,5,5};
+const byte greenmap[] PROGMEM = {2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0};
+const byte bluemap[] PROGMEM =  {2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0};
 
 volatile int encoder0Pos = 0;
-volatile boolean standby=false;// I think is good 2b standby when ya turn it on 
-
-// We'll track the volume level in this variable.
-int8_t thevol = 31;
+volatile boolean standby=true;// I think is good 2b standby when ya turn it on 
 
 byte speaker[8] = {
   B00010,
@@ -166,8 +167,8 @@ void setup(){
   pinMode(BACKLIGHT, OUTPUT);
   digitalWrite(MUTESIGNALPIN, LOW);
     // set up the LCD's number of columns and rows:
-  lcd.createChar(0, speaker);
-  lcd.createChar(1, loud);
+  lcd.createChar(SPEAKER, speaker);
+  lcd.createChar(LOUD, loud);
   lcd.begin(16, 2);
   // Print a message to the LCD.
   lcd.print("power amp on");
@@ -193,76 +194,81 @@ void setup(){
   pixels.begin(); // This initializes the NeoPixel library.
 
   updatering(0);
+
+  standbystate();
 }
 
 void loop(){
-  // set the cursor to column 0, line 1
-  // (note: line 1 is the second row, since counting begins with 0):
+
   static int enchange=0;
   
   boolean temp;
   
-  if ((encoder0Pos != enchange) && !standby){
-    //we do this here and use enchange so the interrupt 
-    //cant change the value between the if statement and the update
-    //setvolume
-    enchange = encoder0Pos;
-    if (enchange>63){
-      enchange = 63;
-      encoder0Pos = 63;
-    }
-    if (enchange<0){
-      enchange=0;
-      encoder0Pos = 0;
-    }
-    updatelcd(enchange);
-    updatering(enchange);
-    if (!setvolume(int8_t(enchange)))
-      msglcd("I2C ERROR");
-  }
-  
- // temp = digitalRead(mutebuttonPin);
   if (standby)
     blinkring();
-    
+  else{  
+    if ((encoder0Pos != enchange)){
+      //we do this here and use enchange so the interrupt 
+      //cant change the value between the if statement and the update
+      //setvolume
+      enchange = encoder0Pos;
+      if (enchange>63){
+        enchange = 63;
+        encoder0Pos = 63;
+      }
+      if (enchange<0){
+        enchange=0;
+        encoder0Pos = 0;
+      }
+      updatelcd(enchange);
+      updatering(enchange);
+      if (!setvolume(int8_t(enchange)))
+        msglcd("I2C ERROR");
+    }
+  }  
+   
   if (digitalRead(MUTEBUTTONPIN)==LOW){
     standby=!standby;
-    //digitalWrite(13,HIGH);
     if (standby){
       //mute and go standby
-      //digitalWrite(13, LOW);
       for (int i=enchange; i>0; i--){
         updatelcd(i);
         updatering(i);
         if (!setvolume(int8_t(i)))
           msglcd("I2C ERROR");
-        analogWrite(BACKLIGHT, (byte)(255.0*i/enchange));
+        analogWrite(BACKLIGHT, (byte)(255.0*(i+1)/(enchange+1)));
         delay(10);
       }
-      digitalWrite(MUTESIGNALPIN, HIGH);
-      digitalWrite(BACKLIGHT, LOW);
-      mutelcd();
+      standbystate();
     }else{
-      //digitalWrite(13, HIGH);
       digitalWrite(MUTESIGNALPIN, LOW);
-      //digitalWrite(BACKLIGHT, HIGH);
       encoder0Pos = enchange; //if vol knob turned during standby, dismiss result
       //wakeup. do it slowly, we dont want to blow our tweeters
-      for (int i=0; i<enchange; i++){
+      for (int i=0; i<=enchange; i++){
         updatelcd(i);
         updatering(i);
         if (!setvolume(int8_t(i)))
           msglcd("I2C ERROR");
-        analogWrite(BACKLIGHT, (byte)(255.0*i/enchange));   
+        analogWrite(BACKLIGHT, (byte)(255.0*(i+1)/(enchange+1)));   
         delay(10);
       }
-      
+      //awakestate();
     }
     while(digitalRead(MUTEBUTTONPIN)==LOW){};
-    delay(1000);//software debounce
+    delay(500);//software debounce
   }
-  //delay(100);
   
+}
+
+void standbystate(){
+  digitalWrite(MUTESIGNALPIN, HIGH);
+  analogWrite(BACKLIGHT, 0);
+  mutelcd();
+}
+
+void awakestate(){
+  digitalWrite(MUTESIGNALPIN, LOW);
+  analogWrite(BACKLIGHT, 255);
 }
 
 void mutelcd(){
@@ -301,31 +307,53 @@ void msglcd(String m){
 void updatering(int encoder){
 
   for(int i=0;i<NUMPIXELS;i++){
-    pixels.setPixelColor(i, pixels.Color(0,0,0)); // grey.
+    pixels.setPixelColor(i, pixels.Color(0,0,0)); // clear
   }
 
-  pixels.setPixelColor( encoder/4, 
+  pixels.setPixelColor(MAXPIXEL-encoder/4, 
                         pixels.Color(pgm_read_byte_near(redmap+(encoder/4)),
                                      pgm_read_byte_near(greenmap+(encoder/4)),
                                      pgm_read_byte_near(bluemap+(encoder/4))));
+  
   pixels.show(); // This sends the updated pixel color to the hardware.
 }
 
 void blinkring(){
-  static byte bouncy=1;
-  static int delaycnt=30001;
-  static int steps=1;
-
+  static byte bouncy = 1;
+  static unsigned int delaycnt = 10000;
+  static int steps = 1;
+  static byte phase =0;
+  static byte cycles = 0;
   delaycnt++;
   
-  if (delaycnt > 30000){
-    bouncy += steps;
-    if (bouncy>10) steps=-1;
-    if (bouncy<1) steps=1;
-    
+  if (delaycnt > 10001){
     delaycnt=0;
-    for (int i=0; i<NUMPIXELS; i++){
-      pixels.setPixelColor(i, pixels.Color(bouncy, bouncy, bouncy));
+    if (cycles % 3 == 0){
+      for (int i=0; i<NUMPIXELS; i++){
+        pixels.setPixelColor(i, pixels.Color(0, 0, 0));
+      }
+      pixels.setPixelColor(0+(phase%8), pixels.Color(10,10,10));
+      pixels.setPixelColor(8+(phase%8), pixels.Color(10,10,10));
+      
+      phase++;
+      if (phase>63) {
+      phase=0;
+      cycles++;
+      }
+    }
+    else{
+  
+      bouncy += steps;
+      if (bouncy>6) steps=-1;
+      if (bouncy<2) {
+        cycles++;
+        steps=1;
+      }
+      
+      
+      for (int i=0; i<NUMPIXELS; i++){
+        pixels.setPixelColor(i, pixels.Color(bouncy, bouncy, bouncy));
+      }
     }
     pixels.show();
   }
