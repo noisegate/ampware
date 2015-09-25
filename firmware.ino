@@ -38,16 +38,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define encoder0PinB 3   //atmel pin 5_PD3
 
 //other functionality
-#define MUTEBUTTONPIN 4  //atmel pin 6_PD4
-#define BACKLIGHT 5      //atmel pin 11_PB5 must be pwm
-#define NEOPIN 6         //atmel pin 12_PD6 must be pwm
-#define MUTESIGNALPIN 7  //atmel pin 13_PD7
+#define MUTEBUTTONPIN 9  //atmel pin 15_PB1
+#define BACKLIGHT 11     //atmel pin 17_PB3 must be pwm
+#define NEOPIN 10        //atmel pin 16_PB2 must be pwm
+#define MUTESIGNALPIN 4  //atmel pin 06_PD4
 
 #define RS    13        //atmel pin 19_PB5 LCD pin 4
 #define EN    12        //atmel pin 18_PB4 LCD pin 6
-#define D4    11        //atmel pin 17_PB3 LCD pin 11
-#define D5    10        //atmel pin 16_PB2 LCD pin 12   
-#define D6     9        //atmel pin 15_PB1 LCD pin 13
+#define D4     5        //atmel pin 11_PD5 LCD pin 11
+#define D5     6        //atmel pin 12_PD6 LCD pin 12   
+#define D6     7        //atmel pin 13_PD7 LCD pin 13
 #define D7     8        //atmel pin 14_PB0 LCD pin 14
 
 #define SPEAKER 0       //custom character
