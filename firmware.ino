@@ -161,7 +161,7 @@ LiquidCrystal lcd(RS, EN,D4,D5,D6,D7);
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, NEOPIN, NEO_GRB + NEO_KHZ800);
 
 void setup(){
-  pinMode(13, OUTPUT);
+  //pinMode(13, OUTPUT);
   pinMode(MUTESIGNALPIN, OUTPUT);
   pinMode(MUTEBUTTONPIN, INPUT_PULLUP);
   pinMode(BACKLIGHT, OUTPUT);
