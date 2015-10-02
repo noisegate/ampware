@@ -161,7 +161,7 @@ LiquidCrystal lcd(RS, EN,D4,D5,D6,D7);
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, NEOPIN, NEO_GRB + NEO_KHZ800);
 
 void setup(){
-  //pinMode(13, OUTPUT);
+  //pcbpinMode(13, OUTPUT);
   pinMode(MUTESIGNALPIN, OUTPUT);
   pinMode(MUTEBUTTONPIN, INPUT_PULLUP);
   pinMode(BACKLIGHT, OUTPUT);
@@ -261,13 +261,13 @@ void loop(){
 }
 
 void standbystate(){
-  digitalWrite(MUTESIGNALPIN, HIGH);
+  digitalWrite(MUTESIGNALPIN, LOW);
   analogWrite(BACKLIGHT, 0);
   mutelcd();
 }
 
 void awakestate(){
-  digitalWrite(MUTESIGNALPIN, LOW);
+  digitalWrite(MUTESIGNALPIN, HIGH);
   analogWrite(BACKLIGHT, 255);
 }
 
@@ -328,7 +328,7 @@ void blinkring(){
   
   if (delaycnt > 10001){
     delaycnt=0;
-    if (cycles % 3 == 0){
+    if (cycles == 0){
       for (int i=0; i<NUMPIXELS; i++){
         pixels.setPixelColor(i, pixels.Color(0, 0, 0));
       }
@@ -338,7 +338,7 @@ void blinkring(){
       phase++;
       if (phase>63) {
       phase=0;
-      cycles++;
+      cycles=1;
       }
     }
     else{
@@ -346,7 +346,7 @@ void blinkring(){
       bouncy += steps;
       if (bouncy>6) steps=-1;
       if (bouncy<2) {
-        cycles++;
+        //cycles++;
         steps=1;
       }
       
