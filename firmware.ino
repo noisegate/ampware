@@ -1,7 +1,7 @@
 /*
 firmware for TransistorLove Industries class D amplifier.
 Copyright (C) 2015 Marcell Marosvolgyi
-
+  
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as publisgithed by the Free Software Foundation; either version 2
@@ -15,6 +15,9 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+
 */
 
 #include <LiquidCrystal.h>
@@ -26,6 +29,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   #include <avr/power.h>
 #endif
 
+#define MAXMODES       3  //max number of blinking modes
 #define NUMPIXELS      16
 #define MAXPIXEL       NUMPIXELS-1 //the zerobased highest address
 
@@ -134,6 +138,7 @@ const byte bluemap[] PROGMEM =  {2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0};
 
 volatile int encoder0Pos = 0;
 volatile boolean standby=true;// I think is good 2b standby when ya turn it on 
+volatile byte blinkmode=0;
 
 byte speaker[8] = {
   B00010,
@@ -220,7 +225,7 @@ void loop(){
         enchange=0;
         encoder0Pos = 0;
       }
-      updatelcd(enchange);
+        updatelcd(enchange);
       updatering(enchange);
       if (!setvolume(int8_t(enchange)))
         msglcd("I2C ERROR");
@@ -228,33 +233,53 @@ void loop(){
   }  
    
   if (digitalRead(MUTEBUTTONPIN)==LOW){
-    standby=!standby;
-    if (standby){
-      //mute and go standby
-      for (int i=enchange; i>0; i--){
-        updatelcd(i);
-        updatering(i);
-        if (!setvolume(int8_t(i)))
-          msglcd("I2C ERROR");
-        analogWrite(BACKLIGHT, (byte)(255.0*(i+1)/(enchange+1)));
-        delay(10);
+
+    int t0 = millis();
+    boolean clp = true;//check longpress
+    
+    while(digitalRead(MUTEBUTTONPIN)==LOW){
+      //dont just wait till release but decide what if
+      //it is a long press...
+      if (((millis()-t0)>1000)&&clp){
+        //handle long press
+        blinkmode++;
+        if (blinkmode>MAXMODES) blinkmode=0;
+        clp=false;//dont repeat during longpress
       }
-      standbystate();
-    }else{
-      digitalWrite(MUTESIGNALPIN, LOW);
-      encoder0Pos = enchange; //if vol knob turned during standby, dismiss result
-      //wakeup. do it slowly, we dont want to blow our tweeters
-      for (int i=0; i<=enchange; i++){
-        updatelcd(i);
-        updatering(i);
-        if (!setvolume(int8_t(i)))
-          msglcd("I2C ERROR");
-        analogWrite(BACKLIGHT, (byte)(255.0*(i+1)/(enchange+1)));   
-        delay(10);
+    };
+
+    if (clp){
+      //if clp still true, there was no longpress so toggle function
+      //and do whatever has to be done
+      standby=!standby;
+      
+      if (standby){
+        //mute and go standby
+        for (int i=enchange; i>0; i--){
+          updatelcd(i);
+          updatering(i);
+          if (!setvolume(int8_t(i)))
+            msglcd("I2C ERROR");
+          analogWrite(BACKLIGHT, (byte)(255.0*(i+1)/(enchange+1)));
+          delay(10);
+        }
+        standbystate();
+      }else{
+        digitalWrite(MUTESIGNALPIN, LOW);
+        encoder0Pos = enchange; //if vol knob turned during standby, dismiss result
+        //wakeup. do it slowly, we dont want to blow our tweeters
+        for (int i=0; i<=enchange; i++){
+          updatelcd(i);
+          updatering(i);
+          if (!setvolume(int8_t(i)))
+            msglcd("I2C ERROR");
+          analogWrite(BACKLIGHT, (byte)(255.0*(i+1)/(enchange+1)));   
+          delay(10);
+        }
+        //awakestate();
       }
-      //awakestate();
     }
-    while(digitalRead(MUTEBUTTONPIN)==LOW){};
+    
     delay(500);//software debounce
   }
   
@@ -352,8 +377,14 @@ void blinkring(){
       
       
       for (int i=0; i<NUMPIXELS; i++){
-        pixels.setPixelColor(i, pixels.Color(bouncy, bouncy, bouncy));
+        if (blinkmode==0)
+          pixels.setPixelColor(i, pixels.Color(bouncy, bouncy, bouncy));
+        if (blinkmode==1)
+          pixels.setPixelColor(i, wheel((i+phase)*16));
+        if (blinkmode==2)
+          pixels.setPixelColor(i, pixels.Color(0, 0, bouncy));
       }
+      phase++;
     }
     pixels.show();
   }
@@ -420,4 +451,25 @@ void doEncoderB(){
   }
 }
 
+
+uint32_t wheel(byte WheelPos) {
+  // Input a value 0 to 255 to get a color value.
+  // The colours are a transition r - g - b - back to r.
+  // code with small adaptation from 
+  // https://learn.adafruit.com/florabrella/test-the-neopixel-strip
+  // 85 = 256/3 256 = full circle 
+
+
+  if(WheelPos < 85) {
+   return pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  } 
+  else if(WheelPos < 170) {
+   WheelPos -= 85;
+   return pixels.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } 
+  else {
+   WheelPos -= 170;
+   return pixels.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+}
 
