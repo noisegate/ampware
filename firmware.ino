@@ -132,9 +132,9 @@ const float decibel[] PROGMEM = {
   9.5
 };
 
-const byte redmap[] PROGMEM =   {2,2,2,2,2,2,2,2,2,2,3,4,5,5,5,5};
-const byte greenmap[] PROGMEM = {2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0};
-const byte bluemap[] PROGMEM =  {2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0};
+const byte redmap[] PROGMEM =   {5,5,5,5,5,5,5,5,5,5,5,10,10,10,10,10};
+const byte greenmap[] PROGMEM = {5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0};
+const byte bluemap[] PROGMEM =  {5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0};
 
 volatile int encoder0Pos = 0;
 volatile boolean standby=true;// I think is good 2b standby when ya turn it on 
@@ -234,17 +234,27 @@ void loop(){
    
   if (digitalRead(MUTEBUTTONPIN)==LOW){
 
-    int t0 = millis();
-    boolean clp = true;//check longpress
-    
+    unsigned long t0;
+    boolean clp;//check longpress
+
+    t0 = millis();
+    clp = true;
+
+    flashring();//alwayz feeback!!
+
+     
     while(digitalRead(MUTEBUTTONPIN)==LOW){
       //dont just wait till release but decide what if
       //it is a long press...
       if (((millis()-t0)>1000)&&clp){
         //handle long press
+        flashring();//need some feedback!!
+        flashring();//twice @ longpress
         blinkmode++;
         if (blinkmode>MAXMODES) blinkmode=0;
         clp=false;//dont repeat during longpress
+        if (!standby)
+          updatering(enchange);
       }
     };
 
@@ -256,26 +266,28 @@ void loop(){
       if (standby){
         //mute and go standby
         for (int i=enchange; i>0; i--){
-          updatelcd(i);
+          //updatelcd(i);
           updatering(i);
           if (!setvolume(int8_t(i)))
             msglcd("I2C ERROR");
           analogWrite(BACKLIGHT, (byte)(255.0*(i+1)/(enchange+1)));
           delay(10);
         }
+        updatelcd(0);
         standbystate();
       }else{
         digitalWrite(MUTESIGNALPIN, LOW);
         encoder0Pos = enchange; //if vol knob turned during standby, dismiss result
         //wakeup. do it slowly, we dont want to blow our tweeters
         for (int i=0; i<=enchange; i++){
-          updatelcd(i);
+          //updatelcd(i);
           updatering(i);
           if (!setvolume(int8_t(i)))
             msglcd("I2C ERROR");
           analogWrite(BACKLIGHT, (byte)(255.0*(i+1)/(enchange+1)));   
           delay(10);
         }
+        updatelcd(enchange);
         //awakestate();
       }
     }
@@ -332,7 +344,7 @@ void msglcd(String m){
 void updatering(int encoder){
 
   for(int i=0;i<NUMPIXELS;i++){
-    pixels.setPixelColor(i, pixels.Color(0,0,0)); // clear
+    pixels.setPixelColor(i, pixels.Color(0, 0, 0)); // clear
   }
 
   pixels.setPixelColor(MAXPIXEL-encoder/4, 
@@ -388,6 +400,22 @@ void blinkring(){
     }
     pixels.show();
   }
+}
+
+void flashring(void){
+  //flash entire ring once. 
+  //I think direct feedback is a good thing, 
+  //you should know if the device got your message
+  for (int i=0; i<NUMPIXELS;i++){
+    pixels.setPixelColor(i, pixels.Color(10, 10, 10));
+  }
+  pixels.show();
+  delay(200);
+  for (int i=0; i<NUMPIXELS;i++){
+    pixels.setPixelColor(i, pixels.Color(0, 0, 0));
+  }  
+  pixels.show();
+  delay(200);
 }
 
 boolean setvolume(int8_t v) {
@@ -461,15 +489,15 @@ uint32_t wheel(byte WheelPos) {
 
 
   if(WheelPos < 85) {
-   return pixels.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+   return pixels.Color((WheelPos * 3)/20, (255 - WheelPos * 3)/20, 0);
   } 
   else if(WheelPos < 170) {
    WheelPos -= 85;
-   return pixels.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+   return pixels.Color((255 - WheelPos * 3)/20, 0, (WheelPos * 3)/20);
   } 
   else {
    WheelPos -= 170;
-   return pixels.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+   return pixels.Color(0, (WheelPos * 3)/20, (255 - WheelPos * 3)/20);
   }
 }
 
