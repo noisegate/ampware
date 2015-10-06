@@ -29,7 +29,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
   #include <avr/power.h>
 #endif
 
-#define MAXMODES       3  //max number of blinking modes
+#define MAXMODES       5  //max number of blinking modes
 #define NUMPIXELS      16
 #define MAXPIXEL       NUMPIXELS-1 //the zerobased highest address
 
@@ -241,17 +241,31 @@ void loop(){
     clp = true;
 
     flashring();//alwayz feeback!!
-
      
     while(digitalRead(MUTEBUTTONPIN)==LOW){
       //dont just wait till release but decide what if
       //it is a long press...
-      if (((millis()-t0)>1000)&&clp){
+      if (((millis()-t0)>1000) && clp && standby){
         //handle long press
         flashring();//need some feedback!!
         flashring();//twice @ longpress
         blinkmode++;
         if (blinkmode>MAXMODES) blinkmode=0;
+       
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print ("blinkmode: ");
+        lcd.print (blinkmode);
+        for (byte i=0; i<255;i++){
+          analogWrite(BACKLIGHT, i);
+          delay(10);
+        }
+        delay(500);
+        for (byte i=255; i>0;i--){
+          analogWrite(BACKLIGHT, i);
+          delay(2);
+        }
+        msglcd("standby");
         clp=false;//dont repeat during longpress
         if (!standby)
           updatering(enchange);
@@ -381,20 +395,25 @@ void blinkring(){
     else{
   
       bouncy += steps;
-      if (bouncy>6) steps=-1;
+      if (bouncy>60) steps=-1;
       if (bouncy<2) {
         //cycles++;
         steps=1;
       }
       
-      
       for (int i=0; i<NUMPIXELS; i++){
         if (blinkmode==0)
-          pixels.setPixelColor(i, pixels.Color(bouncy, bouncy, bouncy));
+          pixels.setPixelColor(i, pixels.Color(bouncy/10, bouncy/10, bouncy/10));
         if (blinkmode==1)
           pixels.setPixelColor(i, wheel((i+phase)*16));
         if (blinkmode==2)
-          pixels.setPixelColor(i, pixels.Color(0, 0, bouncy));
+          pixels.setPixelColor(i, pixels.Color(0, 0, bouncy/10));
+        if (blinkmode==3)
+          pixels.setPixelColor(i, pixels.Color(bouncy/10, 0, bouncy/10));          
+        if (blinkmode==4)
+          pixels.setPixelColor(i, pixels.Color(bouncy/10, 0, 0));                    
+        if (blinkmode==5)
+          pixels.setPixelColor(i, pixels.Color(0, bouncy/10, 0));                              
       }
       phase++;
     }
