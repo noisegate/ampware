@@ -290,7 +290,12 @@ void loop(){
         updatelcd(0);
         standbystate();
       }else{
-        digitalWrite(MUTESIGNALPIN, LOW);
+        //make sure we are quiet before turnign up the vol
+        if (!setvolume(int8_t(0))){
+          msglcd("I2C ERROR");
+          for(;;){}
+        }
+        digitalWrite(MUTESIGNALPIN, HIGH);  
         encoder0Pos = enchange; //if vol knob turned during standby, dismiss result
         //wakeup. do it slowly, we dont want to blow our tweeters
         for (int i=0; i<=enchange; i++){
@@ -302,7 +307,7 @@ void loop(){
           delay(10);
         }
         updatelcd(enchange);
-        //awakestate();
+        awakestate();
       }
     }
     
