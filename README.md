@@ -11,4 +11,7 @@ and other interface gimmicks.
 
 ##the amp
 
-<img src="./artwork/classdtubeamp_smaller.jpg">
+<img src="./artwork/P1010270.JPG" width=512px>
+
+<img src="./artwork/classdtubeamp_smaller.jpg" width=250px>
+<img src="./artwork/P1010313.JPG" width=250px>
