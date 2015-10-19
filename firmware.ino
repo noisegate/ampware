@@ -139,6 +139,7 @@ const byte bluemap[] PROGMEM =  {5,5,5,5,5,5,5,5,5,5,5,0,0,0,0,0};
 volatile int encoder0Pos = 0;
 volatile boolean standby=true;// I think is good 2b standby when ya turn it on 
 volatile byte blinkmode=0;
+volatile boolean blinkandplay=false;
 
 byte speaker[8] = {
   B00010,
@@ -206,8 +207,9 @@ void setup(){
 void loop(){
 
   static int enchange=0;
-  
   boolean temp;
+  unsigned long t0;
+  boolean clp;//check longpress
   
   if (standby)
     blinkring();
@@ -225,18 +227,17 @@ void loop(){
         enchange=0;
         encoder0Pos = 0;
       }
-        updatelcd(enchange);
+      updatelcd(enchange);
       updatering(enchange);
       if (!setvolume(int8_t(enchange)))
         msglcd("I2C ERROR");
     }
+      
+    if(blinkandplay)
+      blinkring();
   }  
    
   if (digitalRead(MUTEBUTTONPIN)==LOW){
-
-    unsigned long t0;
-    boolean clp;//check longpress
-
     t0 = millis();
     clp = true;
 
@@ -245,30 +246,38 @@ void loop(){
     while(digitalRead(MUTEBUTTONPIN)==LOW){
       //dont just wait till release but decide what if
       //it is a long press...
-      if (((millis()-t0)>1000) && clp && standby){
+      if (((millis()-t0)>1000) && clp ){
         //handle long press
         flashring();//need some feedback!!
         flashring();//twice @ longpress
-        blinkmode++;
-        if (blinkmode>MAXMODES) blinkmode=0;
-       
-        lcd.clear();
-        lcd.setCursor(0,0);
-        lcd.print ("blinkmode: ");
-        lcd.print (blinkmode);
-        for (byte i=0; i<255;i++){
-          analogWrite(BACKLIGHT, i);
-          delay(10);
+        
+        if (standby){
+          blinkmode++;
+          if (blinkmode>MAXMODES) blinkmode=0;
+         
+          lcd.clear();
+          lcd.setCursor(0,0);
+          lcd.print ("blinkmode: ");
+          lcd.print (blinkmode);
+          for (byte i=0; i<255;i++){
+            analogWrite(BACKLIGHT, i);
+            delay(10);
+          }
+          delay(200);
+          for (byte i=255; i>0;i--){
+            analogWrite(BACKLIGHT, i);
+            delay(2);
+          }
+          msglcd("standby");
         }
-        delay(500);
-        for (byte i=255; i>0;i--){
-          analogWrite(BACKLIGHT, i);
-          delay(2);
-        }
-        msglcd("standby");
-        clp=false;//dont repeat during longpress
-        if (!standby)
+        else{
+          blinkandplay = !blinkandplay;
           updatering(enchange);
+        }
+        
+        clp=false;//dont repeat during longpress
+        //if (!standby)
+        //  updatering(enchange);
       }
     };
 
