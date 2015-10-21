@@ -15,3 +15,5 @@ and other interface gimmicks.
 
 <img src="./artwork/classdtubeamp_smaller.jpg" width=250px>
 <img src="./artwork/P1010313.JPG" width=250px>
+
+<a href="https://www.tindie.com/stores/noisegate/?ref=offsite_badges&utm_source=sellers_noisegate&utm_medium=badges&utm_campaign=badge_small"><img src="https://d2ss6ovg47m0r5.cloudfront.net/badges/tindie-smalls.png" alt="I sell on Tindie"width="200" height="55"></a>
